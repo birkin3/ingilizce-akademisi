@@ -4,18 +4,34 @@ from gtts import gTTS
 import base64
 from io import BytesIO
 
-# --- 1. API VE SES AYARLARI ---
-API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw" 
+# --- 1. API YAPILANDIRMASI ---
+API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw"
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Modelleri deneme sırasına alıyoruz (Hata payını sıfırlamak için)
+@st.cache_resource
+def load_model():
+    model_names = ['gemini-1.5-flash', 'gemini-pro']
+    for name in model_names:
+        try:
+            m = genai.GenerativeModel(name)
+            # Küçük bir test yapalım çalışıyor mu?
+            m.generate_content("test") 
+            return m
+        except:
+            continue
+    return None
+
+model = load_model()
 
 def metni_sese_cevir(text):
-    """Metni ses dosyasına çevirir ve HTML ses çalar oluşturur."""
-    sound_file = BytesIO()
-    # İngilizce aksanı için 'en' dili kullanılıyor
-    tts = gTTS(text=text, lang='en', slow=False)
-    tts.write_to_fp(sound_file)
-    return sound_file
+    try:
+        sound_file = BytesIO()
+        tts = gTTS(text=text, lang='en', slow=False)
+        tts.write_to_fp(sound_file)
+        return sound_file
+    except:
+        return None
 
 st.set_page_config(page_title="Mehmet Akif & Hatice Kübra İngilizce", page_icon="🇬🇧", layout="wide")
 
@@ -41,7 +57,7 @@ current_user = st.session_state.current_user
 with st.sidebar:
     st.title(f"👤 {current_user}")
     st.image("https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg")
-    st.session_state.user_data["level"] = st.selectbox("Seviye:", ["A1", "A2", "B1", "B2", "C1", "C2"], index=0)
+    st.session_state.user_data["level"] = st.selectbox("Seviye:", ["A1", "A2", "B1", "B2", "C1", "C2"])
     st.session_state.user_data["unit"] = st.number_input("Ünite:", min_value=1, value=st.session_state.user_data["unit"])
     st.divider()
     st.metric(label="⭐ Puan", value=st.session_state.user_data['score'])
@@ -57,11 +73,6 @@ for i, message in enumerate(st.session_state.messages):
     avatar = "https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg" if message["role"] == "assistant" else None
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
-        # Eğer mesaj yapay zekadan gelmişse ses butonunu ekle
-        if message["role"] == "assistant":
-            if st.button(f"🔊 Dinle (Mesaj {i})"):
-                audio_data = metni_sese_cevir(message["content"])
-                st.audio(audio_data, format="audio/mp3")
 
 if prompt := st.chat_input("Buraya yazın..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -69,20 +80,23 @@ if prompt := st.chat_input("Buraya yazın..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant", avatar="https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg"):
-        system_instruction = f"Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}. Kelime okunuşlarını 🔊 formatında yaz. Görsel için: ![image](https://loremflickr.com/600/400/<keyword>)"
-        
-        try:
-            chat = model.start_chat(history=[])
-            response = chat.send_message(f"{system_instruction}\n\nÖğrenci mesajı: {prompt}")
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+        if model is None:
+            st.error("Üzgünüm, şu an yapay zeka servisine ulaşılamıyor. Lütfen API anahtarınızı kontrol edin.")
+        else:
+            system_instruction = f"Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}. Kelime okunuşlarını 🔊 formatında yaz. Görsel için: ![image](https://loremflickr.com/600/400/<keyword>)"
             
-            # Ses butonu ekle
-            audio_data = metni_sese_cevir(response.text)
-            st.audio(audio_data, format="audio/mp3")
-            
-            if "correct" in response.text.lower() or "doğru" in response.text.lower():
-                st.session_state.user_data["score"] += 10
-                st.toast("🎉 Puan Kazandın!")
-        except Exception as e:
-            st.error(f"Bağlantı sorunu: {e}")
+            try:
+                response = model.generate_content(f"{system_instruction}\n\nÖğrenci: {prompt}")
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
+                # Ses butonu ekle
+                audio_data = metni_sese_cevir(response.text)
+                if audio_data:
+                    st.audio(audio_data, format="audio/mp3")
+                
+                if "correct" in response.text.lower() or "doğru" in response.text.lower():
+                    st.session_state.user_data["score"] += 10
+                    st.toast("🎉 Puan Kazandın!")
+            except Exception as e:
+                st.error(f"Bir sorun oluştu: {e}")
