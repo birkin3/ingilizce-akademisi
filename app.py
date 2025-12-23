@@ -1,44 +1,31 @@
 import streamlit as st
 import google.generativeai as genai
 from gtts import gTTS
-import base64
 from io import BytesIO
 
 # --- 1. API YAPILANDIRMASI ---
-API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw"
+# Paylaştığın yeni anahtarı buraya ekledim
+API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw" 
+
 genai.configure(api_key=API_KEY)
-
-# Modelleri deneme sırasına alıyoruz (Hata payını sıfırlamak için)
-@st.cache_resource
-def load_model():
-    model_names = ['gemini-1.5-flash', 'gemini-pro']
-    for name in model_names:
-        try:
-            m = genai.GenerativeModel(name)
-            # Küçük bir test yapalım çalışıyor mu?
-            m.generate_content("test") 
-            return m
-        except:
-            continue
-    return None
-
-model = load_model()
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 def metni_sese_cevir(text):
     try:
         sound_file = BytesIO()
-        tts = gTTS(text=text, lang='en', slow=False)
+        # gTTS kütüphanesi ile İngilizce seslendirme
+        tts = gTTS(text=text, lang='en')
         tts.write_to_fp(sound_file)
         return sound_file
     except:
         return None
 
-st.set_page_config(page_title="Mehmet Akif & Hatice Kübra İngilizce", page_icon="🇬🇧", layout="wide")
+st.set_page_config(page_title="Mehmet Akif & Hatice Kübra İngilizce", layout="wide")
 
 # --- 2. PROFİL SİSTEMİ ---
 if "current_user" not in st.session_state:
-    st.title("👋 Aile Boyu İngilizce Kursu")
-    st.subheader("Lütfen profilinizi seçin:")
+    st.title("👋 İngilizce Akademisine Hoş Geldiniz")
+    st.subheader("Öğrenci profilinizi seçerek başlayın:")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("👦 Mehmet Akif", use_container_width=True):
@@ -52,51 +39,47 @@ if "current_user" not in st.session_state:
             st.rerun()
     st.stop()
 
-# --- 3. KENAR ÇUBUĞU ---
+# --- 3. SOHBET EKRANI ---
 current_user = st.session_state.current_user
-with st.sidebar:
-    st.title(f"👤 {current_user}")
-    st.image("https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg")
-    st.session_state.user_data["level"] = st.selectbox("Seviye:", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    st.session_state.user_data["unit"] = st.number_input("Ünite:", min_value=1, value=st.session_state.user_data["unit"])
-    st.divider()
-    st.metric(label="⭐ Puan", value=st.session_state.user_data['score'])
-    if st.button("🚪 Profil Değiştir"):
-        st.session_state.clear()
-        st.rerun()
+st.sidebar.title(f"👤 {current_user}")
+st.sidebar.write(f"**Seviye:** {st.session_state.user_data['level']}")
+st.sidebar.write(f"**Ünite:** {st.session_state.user_data['unit']}")
+st.sidebar.metric("⭐ Puan", st.session_state.user_data['score'])
 
-# --- 4. SOHBET AKIŞI ---
+if st.sidebar.button("🚪 Profil Değiştir"):
+    st.session_state.clear()
+    st.rerun()
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for i, message in enumerate(st.session_state.messages):
-    avatar = "https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg" if message["role"] == "assistant" else None
-    with st.chat_message(message["role"], avatar=avatar):
+# Mesaj Geçmişini Görüntüle
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Buraya yazın..."):
+# Kullanıcı Girişi
+if prompt := st.chat_input("Mesajınızı yazın..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant", avatar="https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg"):
-        if model is None:
-            st.error("Üzgünüm, şu an yapay zeka servisine ulaşılamıyor. Lütfen API anahtarınızı kontrol edin.")
-        else:
-            system_instruction = f"Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}. Kelime okunuşlarını 🔊 formatında yaz. Görsel için: ![image](https://loremflickr.com/600/400/<keyword>)"
+    with st.chat_message("assistant"):
+        try:
+            # Yapay zekaya öğretici talimatı gönderiyoruz
+            system_prompt = f"Sen bir İngilizce öğretmenisin. Öğrencinin adı {current_user}. Seviyesi {st.session_state.user_data['level']}. Önce Türkçe kısa bir açıklama yap, sonra İngilizce öğret ve en sonunda bir soru sor."
             
-            try:
-                response = model.generate_content(f"{system_instruction}\n\nÖğrenci: {prompt}")
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+            response = model.generate_content(system_prompt + "\n" + prompt)
+            cevap = response.text
+            
+            st.markdown(cevap)
+            st.session_state.messages.append({"role": "assistant", "content": cevap})
+            
+            # Seslendirme butonu
+            audio = metni_sese_cevir(cevap)
+            if audio:
+                st.audio(audio)
                 
-                # Ses butonu ekle
-                audio_data = metni_sese_cevir(response.text)
-                if audio_data:
-                    st.audio(audio_data, format="audio/mp3")
-                
-                if "correct" in response.text.lower() or "doğru" in response.text.lower():
-                    st.session_state.user_data["score"] += 10
-                    st.toast("🎉 Puan Kazandın!")
-            except Exception as e:
-                st.error(f"Bir sorun oluştu: {e}")
+        except Exception as e:
+            st.error(f"Bir sorun oluştu: {e}")
+            st.info("Eğer hata devam ederse, lütfen 5 dakika bekleyip sayfayı yenileyin (API aktivasyon süresi).")
