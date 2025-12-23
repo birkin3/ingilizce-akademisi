@@ -2,13 +2,13 @@ import streamlit as st
 import google.generativeai as genai
 
 # --- 1. API YAPILANDIRMASI ---
-API_KEY = "AIzaSyCghofUePWU_WYB1R044BacmkH5n2Vm5a8" 
+# Yeni aldığın anahtarı buraya ekledim
+API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw" 
 
-# Hataları engellemek için bağlantı ayarlarını en güvenli hale getirdik
 try:
     genai.configure(api_key=API_KEY)
-    # 404 hatasını çözmek için modeli 'gemini-pro' olarak güncelledik
-    model = genai.GenerativeModel('gemini-pro')
+    # Yeni anahtarınla artık en hızlı model olan 1.5 Flash'ı kullanabiliriz
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
     st.error(f"Başlatma Hatası: {e}")
 
@@ -36,7 +36,9 @@ if "current_user" not in st.session_state:
 current_user = st.session_state.current_user
 with st.sidebar:
     st.title(f"👤 {current_user}")
+    # AI Öğretmen Avatarı
     st.image("https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg")
+    st.markdown("---")
     
     st.session_state.user_data["level"] = st.selectbox(
         "Seviye:", ["A1", "A2", "B1", "B2", "C1", "C2"],
@@ -56,22 +58,32 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Geçmişi Göster
 for message in st.session_state.messages:
     avatar = "https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg" if message["role"] == "assistant" else None
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
+# Giriş ve Yanıt
 if prompt := st.chat_input("Cevabınızı buraya yazın..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant", avatar="https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg"):
-        system_instruction = f"Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}. Kelime okunuşlarını 🔊 formatında yaz. Resim göster: ![image](https://loremflickr.com/600/400/<keyword>)"
+        system_instruction = f"""
+        Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}.
+        - Önce Türkçe selamla ve konuyu anlat.
+        - Kelime okunuşlarını 🔊 formatında yaz.
+        - Önemli kelimeler için resim ekle: ![image](https://loremflickr.com/600/400/<keyword>)
+        - Her cevabın sonunda mutlaka bir soru sor.
+        """
         
         try:
-            # En temel cevap alma yöntemi
-            response = model.generate_content(system_instruction + " " + prompt)
+            # Hafıza yönetimi için mesajları listeye çeviriyoruz
+            messages_for_ai = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
+            # Mesajların başına sistem talimatını ekliyoruz
+            response = model.generate_content([system_instruction] + [m["content"] for m in st.session_state.messages])
             
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -80,5 +92,4 @@ if prompt := st.chat_input("Cevabınızı buraya yazın..."):
                 st.session_state.user_data["score"] += 10
                 st.toast("🎉 Puan Kazandın!")
         except Exception as e:
-            st.error("Bir sorun oluştu. Lütfen birkaç dakika sonra tekrar deneyin.")
-            st.info("İpucu: Eğer hata devam ederse yeni bir API Key almanız gerekebilir.")
+            st.error(f"Bir sorun oluştu: {e}")
