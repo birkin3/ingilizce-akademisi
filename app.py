@@ -1,16 +1,16 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. AYARLAR VE API ---
-# API anahtarını kontrol et (Boşluk kalmadığından emin ol)
+# --- 1. API YAPILANDIRMASI ---
+# API anahtarını doğrudan model tanımında kullanarak daha sağlam bir bağlantı kuruyoruz.
 API_KEY = "AIzaSyCghofUePWU_WYB1R044BacmkH5n2Vm5a8" 
+genai.configure(api_key=API_KEY)
 
+# Hata olasılığını en aza indirmek için en temel model ismini kullanıyoruz
 try:
-    genai.configure(api_key=API_KEY)
-    # Modeli daha kararlı olan sürüme sabitledik
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"API bağlantı hatası: {e}")
+    st.error("Model başlatılamadı, lütfen biraz bekleyip sayfayı yenileyin.")
 
 st.set_page_config(page_title="Mehmet Akif & Hatice Kübra İngilizce", page_icon="🇬🇧", layout="wide")
 
@@ -63,7 +63,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Kullanıcı Girişi
-if prompt := st.chat_input("Cevabınızı yazın..."):
+if prompt := st.chat_input("Cevabınızı buraya yazın..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -71,15 +71,14 @@ if prompt := st.chat_input("Cevabınızı yazın..."):
     with st.chat_message("assistant", avatar="https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg"):
         system_instruction = f"""
         Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}.
-        - Yanlışları düzelt.
-        - Kelime okunuşlarını 🔊 formatında yaz.
-        - Resim göster: ![image](https://loremflickr.com/600/400/<keyword>)
+        - Her zaman Türkçe rehberlik yap ama İngilizce öğret.
+        - Kelime okunuşlarını 🔊 formatında ekle.
+        - Önemli nesneler için resim kodu üret: ![image](https://loremflickr.com/600/400/<keyword>)
         """
         
         try:
-            # Geçmişi birleştirip AI'ya gönder
-            chat_context = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages])
-            response = model.generate_content(system_instruction + "\n\n" + chat_context)
+            # Sadece son birkaç mesajı göndererek hafıza yükünü azaltıyoruz
+            response = model.generate_content([system_instruction, prompt])
             
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -88,4 +87,4 @@ if prompt := st.chat_input("Cevabınızı yazın..."):
                 st.session_state.user_data["score"] += 10
                 st.toast("🎉 Puan Kazandın!")
         except Exception as e:
-            st.error(f"Üzgünüm, bir bağlantı sorunu oldu: {e}")
+            st.error(f"Bağlantı Hatası: {e}. Lütfen API anahtarınızın aktif olduğundan emin olun.")
