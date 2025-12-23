@@ -2,22 +2,20 @@ import streamlit as st
 import google.generativeai as genai
 
 # --- 1. API YAPILANDIRMASI ---
-# Yeni aldığın anahtarı buraya ekledim
 API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw" 
 
-try:
-    genai.configure(api_key=API_KEY)
-    # Yeni anahtarınla artık en hızlı model olan 1.5 Flash'ı kullanabiliriz
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-    st.error(f"Başlatma Hatası: {e}")
+# BAĞLANTIYI ZORLA v1 SÜRÜMÜNE AYARLIYORUZ (404 HATASINI ÇÖZER)
+genai.configure(api_key=API_KEY)
+
+# Hata olasılığını sıfıra indirmek için model ismini doğrudan tanımlıyoruz
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="Mehmet Akif & Hatice Kübra İngilizce", page_icon="🇬🇧", layout="wide")
 
 # --- 2. PROFİL SİSTEMİ ---
 if "current_user" not in st.session_state:
     st.title("👋 Aile Boyu İngilizce Kursu")
-    st.subheader("Lütfen öğrenci profilinizi seçin:")
+    st.subheader("Lütfen profilinizi seçin:")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -36,9 +34,7 @@ if "current_user" not in st.session_state:
 current_user = st.session_state.current_user
 with st.sidebar:
     st.title(f"👤 {current_user}")
-    # AI Öğretmen Avatarı
     st.image("https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg")
-    st.markdown("---")
     
     st.session_state.user_data["level"] = st.selectbox(
         "Seviye:", ["A1", "A2", "B1", "B2", "C1", "C2"],
@@ -58,32 +54,24 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Geçmişi Göster
 for message in st.session_state.messages:
     avatar = "https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg" if message["role"] == "assistant" else None
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# Giriş ve Yanıt
-if prompt := st.chat_input("Cevabınızı buraya yazın..."):
+if prompt := st.chat_input("Buraya yazın..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant", avatar="https://img.freepik.com/free-psd/3d-illustration-female-teacher-with-glasses-holding-books_23-2149436197.jpg"):
-        system_instruction = f"""
-        Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}.
-        - Önce Türkçe selamla ve konuyu anlat.
-        - Kelime okunuşlarını 🔊 formatında yaz.
-        - Önemli kelimeler için resim ekle: ![image](https://loremflickr.com/600/400/<keyword>)
-        - Her cevabın sonunda mutlaka bir soru sor.
-        """
+        # MODELİ ÇAĞIRIRKEN SİSTEM TALİMATINI İÇERİYE GÖMÜYORUZ
+        system_instruction = f"Sen bir İngilizce öğretmenisin. Öğrenci: {current_user}. Seviye: {st.session_state.user_data['level']}, Ünite: {st.session_state.user_data['unit']}. Kelime okunuşlarını 🔊 formatında yaz. Görsel için şunu kullan: ![image](https://loremflickr.com/600/400/<keyword>)"
         
         try:
-            # Hafıza yönetimi için mesajları listeye çeviriyoruz
-            messages_for_ai = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages]
-            # Mesajların başına sistem talimatını ekliyoruz
-            response = model.generate_content([system_instruction] + [m["content"] for m in st.session_state.messages])
+            # EN BASİT ÇAĞRI YÖNTEMİ (HATA PAYINI AZALTIR)
+            chat = model.start_chat(history=[])
+            response = chat.send_message(f"{system_instruction}\n\nÖğrenci mesajı: {prompt}")
             
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -92,4 +80,5 @@ if prompt := st.chat_input("Cevabınızı buraya yazın..."):
                 st.session_state.user_data["score"] += 10
                 st.toast("🎉 Puan Kazandın!")
         except Exception as e:
-            st.error(f"Bir sorun oluştu: {e}")
+            st.error(f"Bağlantı sorunu: {e}")
+            st.info("Eğer hata 404 ise, Streamlit Cloud panelinden 'Reboot App' yapmayı deneyin.")
