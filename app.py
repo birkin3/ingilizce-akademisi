@@ -6,7 +6,7 @@ import json
 import os
 
 # --- 1. AYARLAR VE VERİTABANI ---
-API_KEY = "BURAYA_YENI_ANAHTARINI_YAPISTIR" # Buraya kimseyle paylaşmadığın anahtarı koy
+API_KEY = "AIzaSyAl-0pGFUf5O2cI0O43ZUTXKU_sNPF6rRk" # Buraya kimseyle paylaşmadığın anahtarı koy
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
@@ -173,3 +173,4 @@ if st.button("🔊 Öğretmeni Dinle"):
     sound_file = BytesIO()
     tts.write_to_fp(sound_file)
     st.audio(sound_file)
+
