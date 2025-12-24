@@ -4,7 +4,7 @@ from gtts import gTTS
 from io import BytesIO
 
 # --- 1. API YAPILANDIRMASI ---
-API_KEY = "AIzaSyCOv-TPknOk_bNgbfhWoG9Ce_QlW1T8vBw"
+API_KEY = "AIzaSyAl-0pGFUf5O2cI0O43ZUTXKU_sNPF6rRk"
 genai.configure(api_key=API_KEY)
 
 # Hata almamak için sistemdeki uygun modeli otomatik bulan fonksiyon
@@ -88,3 +88,4 @@ if prompt := st.chat_input("Mesajınızı yazın..."):
                 if audio: st.audio(audio)
             except Exception as e:
                 st.error(f"Bir hata oluştu: {e}")
+
