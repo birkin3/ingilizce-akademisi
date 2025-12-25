@@ -6,7 +6,7 @@ import json
 import os
 
 # --- 1. API AYARLARI ---
-API_KEY = "AIzaSyDIzvdFif990ghFmAvDJhkpz0greTeQmNo" 
+API_KEY = "AIzaSyBBfIH_3C1uXozGu3gU2FA00JTjCVX8Zjk" 
 genai.configure(api_key=API_KEY)
 
 # Hangi modelin çalıştığını otomatik tespit eden fonksiyon
@@ -176,4 +176,5 @@ else:
                 data["users"][u_name]["lesson"] = 1
                 data["users"][u_name]["unit"] += 1
             save_data(data); st.rerun()
+
 
